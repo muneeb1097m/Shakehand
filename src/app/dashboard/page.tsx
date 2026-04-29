@@ -14,6 +14,7 @@ import {
   RotateCcw,
   MoreVertical,
   Plus,
+  Flame,
   Info
 } from "lucide-react";
 import { 
@@ -149,53 +150,16 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Warm-up Activity */}
-          <div className="lg:col-span-3 p-6 rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm relative overflow-hidden">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">Warm-up Activity</h3>
-                <p className="text-xs text-zinc-400 font-medium">Reputation building progress across all domains</p>
-              </div>
-              <div className="flex gap-2 bg-zinc-50 dark:bg-zinc-800 p-1 rounded-xl">
-                <button className="px-3 py-1.5 text-[10px] font-bold rounded-lg bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-white">Last 7d</button>
-                <button className="px-3 py-1.5 text-[10px] font-bold rounded-lg text-zinc-400 hover:text-zinc-600 transition-colors">Last 30d</button>
-              </div>
+          {/* Email Warm-up Coming Soon */}
+          <div className="lg:col-span-3 p-6 rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm flex flex-col items-center justify-center gap-4 min-h-[220px]">
+            <div className="h-12 w-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+              <Flame className="h-6 w-6 text-zinc-300" />
             </div>
-            <div className="h-[180px] w-full mt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={performanceData}>
-                  <defs>
-                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: "#a1a1aa", fontSize: 10, fontWeight: 600 }}
-                    dy={10}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      borderRadius: "12px",
-                      border: "none",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                      fontSize: "12px"
-                    }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="#3b82f6" 
-                    strokeWidth={3}
-                    fillOpacity={1} 
-                    fill="url(#colorValue)" 
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+            <div className="text-center">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white">Email Warm-up</h3>
+              <p className="text-sm text-zinc-400 mt-1 max-w-xs">Automatic inbox warm-up to protect your sender reputation is coming soon.</p>
             </div>
+            <span className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-full border border-blue-100">Coming Soon</span>
           </div>
         </div>
 

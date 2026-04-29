@@ -1,24 +1,21 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+const PROTECTED = ['/dashboard', '/campaigns', '/contacts', '/templates', '/inbox', '/accounts', '/analytics', '/leads', '/pipelines', '/settings', '/verify']
+const AUTH_ROUTES = ['/login', '/signup', '/forgot-password']
+
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
+  let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
+        getAll() { return request.cookies.getAll() },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
-          })
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )
@@ -27,17 +24,19 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // refreshing the auth token
   const { data: { user } } = await supabase.auth.getUser()
 
-  const protectedRoutes = ['/dashboard', '/campaigns', '/contacts', '/templates', '/inbox', '/accounts', '/analytics', '/leads', '/pipelines', '/settings']
-  const isProtected = protectedRoutes.some(r => request.nextUrl.pathname.startsWith(r))
+  const path = request.nextUrl.pathname
+  const isProtected = PROTECTED.some(r => path.startsWith(r))
+  const isAuthRoute = AUTH_ROUTES.some(r => path.startsWith(r))
 
+  // Not logged in trying to access protected route → send to login
   if (!user && isProtected) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (user && request.nextUrl.pathname.startsWith('/login')) {
+  // Logged in trying to access login/signup → send to dashboard
+  if (user && isAuthRoute) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
