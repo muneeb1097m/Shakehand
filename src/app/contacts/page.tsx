@@ -1,59 +1,34 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { 
   Plus, Search, Filter, Download, MoreVertical, LayoutList, LayoutGrid, 
-  ChevronDown, X, UploadCloud, CheckCircle2, Circle, Search as SearchIcon, AlertCircle, RefreshCw
+  ChevronDown, X, UploadCloud, CheckCircle2, Circle, Search as SearchIcon, AlertCircle, RefreshCw, Loader2, Trash2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-type Contact = {
-  id: string;
-  name: string;
-  email: string;
-  company: string;
-  jobTitle: string;
-  phone: string;
-  verificationStatus: "Verified" | "Unverified";
-  dateAdded: string;
-  customFields?: Record<string, string>;
-};
+import { 
+  getContacts, 
+  addContact, 
+  importContacts, 
+  deleteContact, 
+  type Contact, 
+  type AddContactInput 
+} from "@/lib/actions/contacts";
 
 // System fields for mapping
-const SYSTEM_FIELDS: { key: string; label: string; required: boolean }[] = [
+const SYSTEM_FIELDS: { key: keyof AddContactInput; label: string; required: boolean }[] = [
   { key: "name", label: "Full Name", required: true },
   { key: "email", label: "Email Address", required: true },
-  { key: "jobTitle", label: "Job Title", required: false },
+  { key: "job_title", label: "Job Title", required: false },
   { key: "company", label: "Company Name", required: false },
   { key: "phone", label: "Phone Number", required: false },
 ];
 
 export default function ContactsPage() {
-  const [contacts, setContacts] = useState<Contact[]>([
-    {
-      id: "1",
-      name: "Anil Salvi",
-      email: "anil@saleshandy.com",
-      company: "Saleshandy",
-      jobTitle: "Product Owner",
-      phone: "+1 555-0100",
-      verificationStatus: "Verified",
-      dateAdded: "2h ago"
-    },
-    {
-      id: "2",
-      name: "Piyush Patel",
-      email: "piyush@saleshandy.com",
-      company: "Saleshandy",
-      jobTitle: "Product Owner",
-      phone: "+1 555-0101",
-      verificationStatus: "Unverified",
-      dateAdded: "1d ago"
-    }
-  ]);
-
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("All Contacts");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
@@ -62,10 +37,13 @@ export default function ContactsPage() {
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   
   // Modals state
-  const [addModalType, setAddModalType] = useState<"Manual" | "CSV" | null>(null);
+  const [addModalType, setAddModalType] = useState<"Manual" | "CSV" | "ImportResult" | null>(null);
+  const [importResult, setImportResult] = useState<{ inserted: number; skipped: number } | null>(null);
   
   // Manual Contact State
-  const [manualForm, setManualForm] = useState({ name: "", email: "", company: "", jobTitle: "", phone: "" });
+  const [manualForm, setManualForm] = useState({ name: "", email: "", company: "", job_title: "", phone: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // CSV Flow State
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -78,36 +56,61 @@ export default function ContactsPage() {
   const [newCustomFieldName, setNewCustomFieldName] = useState("");
   const [csvStep, setCsvStep] = useState<"Upload" | "Mapping" | "Importing">("Upload");
 
-  // Filter contacts based on tab
-  let displayedContacts = contacts;
-  if (activeTab === "Unverified") {
-    displayedContacts = contacts.filter(c => c.verificationStatus === "Unverified");
+  useEffect(() => {
+    fetchContacts();
+  }, []);
+
+  async function fetchContacts() {
+    setIsLoading(true);
+    const { data, error } = await getContacts();
+    if (data) setContacts(data);
+    if (error) console.error("Error fetching contacts:", error);
+    setIsLoading(false);
   }
 
   // Handle Manual Add
-  const handleAddManualContact = (e: React.FormEvent) => {
+  const handleAddManualContact = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualForm.name || !manualForm.email) return;
 
-    const newContact: Contact = {
-      id: Date.now().toString(),
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    const { data, error } = await addContact({
       name: manualForm.name,
       email: manualForm.email,
       company: manualForm.company,
-      jobTitle: manualForm.jobTitle,
+      job_title: manualForm.job_title,
       phone: manualForm.phone,
-      verificationStatus: "Verified",
-      dateAdded: "Just now"
-    };
+    });
 
-    setContacts([newContact, ...contacts]);
-    setAddModalType(null);
-    setManualForm({ name: "", email: "", company: "", jobTitle: "", phone: "" });
+    if (error) {
+      setErrorMessage(error);
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (data) {
+      setContacts([data, ...contacts]);
+      setAddModalType(null);
+      setManualForm({ name: "", email: "", company: "", job_title: "", phone: "" });
+    }
+    setIsSubmitting(false);
   };
 
-  // Basic CSV Parser (Simplified for commas within quotes manually doing simple split for now, real use case would use papa parse)
+  const handleDeleteContact = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this contact?")) return;
+
+    const { error } = await deleteContact(id);
+    if (error) {
+      alert("Error deleting contact: " + error);
+    } else {
+      setContacts(contacts.filter(c => c.id !== id));
+    }
+  };
+
+  // Basic CSV Parser
   const parseCSVLine = (text: string) => {
-    // simplified split by comma, ignoring quotes for a basic implementation
     return text.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
   };
 
@@ -139,45 +142,47 @@ export default function ContactsPage() {
     }
   };
 
-  const handleImportCsv = () => {
+  const handleImportCsv = async () => {
     setCsvStep("Importing");
     
-    // Simulate import delay
-    setTimeout(() => {
-      const newContacts: Contact[] = csvRows.map((row, index) => {
-        // Extract based on mapping
-        const extractField = (systemKey: string) => {
-          const mappedHeader = fieldMapping[systemKey];
-          if (!mappedHeader) return "";
+    const contactsToImport: AddContactInput[] = csvRows.map((row) => {
+      const extractField = (systemKey: string) => {
+        const mappedHeader = fieldMapping[systemKey];
+        if (!mappedHeader) return "";
+        const headerIndex = csvHeaders.indexOf(mappedHeader);
+        return headerIndex >= 0 ? row[headerIndex] : "";
+      };
+
+      const contactCustomFields: Record<string, string> = {};
+      customFields.forEach(cf => {
+        const mappedHeader = fieldMapping[cf.key];
+        if (mappedHeader) {
           const headerIndex = csvHeaders.indexOf(mappedHeader);
-          return headerIndex >= 0 ? row[headerIndex] : "";
-        };
-
-        const contactCustomFields: Record<string, string> = {};
-        customFields.forEach(cf => {
-          const val = extractField(cf.key);
+          const val = headerIndex >= 0 ? row[headerIndex] : "";
           if (val) contactCustomFields[cf.label] = val;
-        });
+        }
+      });
 
-        return {
-          id: `csv-${Date.now()}-${index}`,
-          name: extractField("name") || "(No Name)",
-          email: extractField("email"),
-          company: extractField("company"),
-          jobTitle: extractField("jobTitle"),
-          phone: extractField("phone"),
-          verificationStatus: "Unverified" as const,
-          dateAdded: "Just now",
-          customFields: Object.keys(contactCustomFields).length > 0 ? contactCustomFields : undefined
-        };
-      }).filter(c => c.email); // Only import if they have an email at least, or maybe name
+      return {
+        name: extractField("name") || "(No Name)",
+        email: extractField("email"),
+        company: extractField("company"),
+        job_title: extractField("job_title"),
+        phone: extractField("phone"),
+        custom_fields: contactCustomFields
+      };
+    }).filter(c => c.email);
 
-      setContacts([...newContacts, ...contacts]);
-      setAddModalType(null);
-      setCsvStep("Upload");
-      setCsvFile(null);
-      setCustomFields([]); // Reset custom fields after import
-    }, 1500);
+    const { inserted, skipped, error } = await importContacts(contactsToImport);
+
+    if (error) {
+      alert("Import error: " + error);
+      setCsvStep("Mapping");
+    } else {
+      setImportResult({ inserted, skipped });
+      setAddModalType("ImportResult");
+      fetchContacts(); // Refresh list
+    }
   };
 
   const addCustomField = () => {
@@ -191,6 +196,20 @@ export default function ContactsPage() {
     setNewCustomFieldName("");
     setIsAddingCustomField(false);
   };
+
+  // Filter contacts based on tab and search
+  let displayedContacts = contacts.filter(c => {
+    const matchesSearch = 
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      c.email.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (!matchesSearch) return false;
+
+    if (activeTab === "Unverified") {
+      return c.email_status === "unverified";
+    }
+    return true;
+  });
 
   return (
     <div className="flex flex-col min-h-screen bg-zinc-50">
@@ -210,7 +229,7 @@ export default function ContactsPage() {
             {isAddMenuOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white border border-zinc-200 rounded-xl shadow-lg z-50 overflow-hidden text-sm">
                 <button 
-                  onClick={() => { setAddModalType("Manual"); setIsAddMenuOpen(false); }}
+                  onClick={() => { setAddModalType("Manual"); setIsAddMenuOpen(false); setErrorMessage(null); }}
                   className="w-full text-left px-4 py-3 hover:bg-zinc-50 text-zinc-900 border-b border-zinc-100 font-medium"
                 >
                   Add Manually
@@ -241,7 +260,7 @@ export default function ContactsPage() {
                   : "border-transparent text-zinc-500 hover:text-zinc-700"
               )}
             >
-              {tab} {tab === "All Contacts" && <span className="ml-1.5 bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-full text-xs">{contacts.length}</span>}
+              {tab} {tab === "All Contacts" && !isLoading && <span className="ml-1.5 bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-full text-xs">{contacts.length}</span>}
             </button>
           ))}
         </div>
@@ -303,39 +322,68 @@ export default function ContactsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
-                {displayedContacts.map((contact, i) => (
-                  <tr key={contact.id} className="hover:bg-zinc-50/80 transition-colors group">
-                    <td className="px-4 py-3.5"><input type="checkbox" className="rounded border-zinc-300" /></td>
-                    <td className="px-4 py-3.5">
-                      <Link href={`/contacts/${contact.id}`} className="font-semibold text-zinc-900 hover:text-blue-600 transition-colors">{contact.name}</Link>
-                    </td>
-                    <td className="px-4 py-3.5 text-zinc-600 flex items-center gap-2">
-                      {contact.verificationStatus === "Verified" ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                      ) : (
-                        <Circle className="h-4 w-4 text-zinc-300" />
-                      )}
-                      {contact.email}
-                    </td>
-                    <td className="px-4 py-3.5 text-zinc-600">{contact.jobTitle || "-"}</td>
-                    <td className="px-4 py-3.5 text-zinc-600">{contact.company || "-"}</td>
-                    <td className="px-4 py-3.5">
-                      <span className={cn(
-                        "px-2.5 py-1 rounded-md text-[11px] font-bold inline-flex items-center gap-1.5 uppercase tracking-wider",
-                        contact.verificationStatus === "Verified" 
-                          ? "bg-emerald-50 text-emerald-700" 
-                          : "bg-amber-50 text-amber-700"
-                      )}>
-                        {contact.verificationStatus}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <button className="text-zinc-400 hover:text-zinc-900 transition-colors opacity-0 group-hover:opacity-100 p-1">
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-zinc-500">
+                      <div className="flex flex-col items-center gap-3">
+                        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                        <span className="font-medium">Loading contacts...</span>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                ) : displayedContacts.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-zinc-500">
+                      <div className="flex flex-col items-center gap-2">
+                        <Search className="h-8 w-8 text-zinc-300" />
+                        <span className="font-medium">No contacts found</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  displayedContacts.map((contact) => (
+                    <tr key={contact.id} className="hover:bg-zinc-50/80 transition-colors group">
+                      <td className="px-4 py-3.5"><input type="checkbox" className="rounded border-zinc-300" /></td>
+                      <td className="px-4 py-3.5">
+                        <Link href={`/contacts/${contact.id}`} className="font-semibold text-zinc-900 hover:text-blue-600 transition-colors">{contact.name}</Link>
+                      </td>
+                      <td className="px-4 py-3.5 text-zinc-600 flex items-center gap-2">
+                        {contact.email_status === "verified" ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        ) : (
+                          <Circle className="h-4 w-4 text-zinc-300" />
+                        )}
+                        {contact.email}
+                      </td>
+                      <td className="px-4 py-3.5 text-zinc-600">{contact.job_title || "-"}</td>
+                      <td className="px-4 py-3.5 text-zinc-600">{contact.company || "-"}</td>
+                      <td className="px-4 py-3.5">
+                        <span className={cn(
+                          "px-2.5 py-1 rounded-md text-[11px] font-bold inline-flex items-center gap-1.5 uppercase tracking-wider",
+                          contact.email_status === "verified" 
+                            ? "bg-emerald-50 text-emerald-700" 
+                            : "bg-amber-50 text-amber-700"
+                        )}>
+                          {contact.email_status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={() => handleDeleteContact(contact.id)}
+                            className="text-zinc-400 hover:text-red-600 transition-colors p-1"
+                            title="Delete Contact"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                          <button className="text-zinc-400 hover:text-zinc-900 transition-colors p-1">
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -357,21 +405,29 @@ export default function ContactsPage() {
       {/* Manual Add Contact Modal */}
       {addModalType === "Manual" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-zinc-900/40 backdrop-blur-sm" onClick={() => setAddModalType(null)} />
+          <div className="absolute inset-0 bg-zinc-900/40 backdrop-blur-sm" onClick={() => !isSubmitting && setAddModalType(null)} />
           <div className="relative bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            {/* Modal content for Manual Add similar to original (abbreviated for size) */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
               <h2 className="text-lg font-bold">Add Manual Contact</h2>
-              <button onClick={() => setAddModalType(null)} className="p-2 hover:bg-zinc-100 rounded-full"><X className="h-4 w-4" /></button>
+              <button onClick={() => setAddModalType(null)} className="p-2 hover:bg-zinc-100 rounded-full" disabled={isSubmitting}><X className="h-4 w-4" /></button>
             </div>
             <form onSubmit={handleAddManualContact} className="p-6 space-y-4 bg-zinc-50/50">
-              <input required placeholder="Name" className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2.5 text-sm" value={manualForm.name} onChange={e => setManualForm({...manualForm, name: e.target.value})} />
-              <input required type="email" placeholder="Email" className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2.5 text-sm" value={manualForm.email} onChange={e => setManualForm({...manualForm, email: e.target.value})} />
-              <input placeholder="Job Title" className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2.5 text-sm" value={manualForm.jobTitle} onChange={e => setManualForm({...manualForm, jobTitle: e.target.value})} />
-              <input placeholder="Company" className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2.5 text-sm" value={manualForm.company} onChange={e => setManualForm({...manualForm, company: e.target.value})} />
+              {errorMessage && (
+                <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" /> {errorMessage}
+                </div>
+              )}
+              <input required placeholder="Name" className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2.5 text-sm" value={manualForm.name} onChange={e => setManualForm({...manualForm, name: e.target.value})} disabled={isSubmitting} />
+              <input required type="email" placeholder="Email" className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2.5 text-sm" value={manualForm.email} onChange={e => setManualForm({...manualForm, email: e.target.value})} disabled={isSubmitting} />
+              <input placeholder="Job Title" className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2.5 text-sm" value={manualForm.job_title} onChange={e => setManualForm({...manualForm, job_title: e.target.value})} disabled={isSubmitting} />
+              <input placeholder="Company" className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2.5 text-sm" value={manualForm.company} onChange={e => setManualForm({...manualForm, company: e.target.value})} disabled={isSubmitting} />
+              <input placeholder="Phone" className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2.5 text-sm" value={manualForm.phone} onChange={e => setManualForm({...manualForm, phone: e.target.value})} disabled={isSubmitting} />
               <div className="flex justify-end gap-3 pt-4 border-t border-zinc-200">
-                <button type="button" onClick={() => setAddModalType(null)} className="px-4 py-2 text-sm font-semibold rounded-lg hover:bg-zinc-100">Cancel</button>
-                <button type="submit" className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md">Add Contact</button>
+                <button type="button" onClick={() => setAddModalType(null)} className="px-4 py-2 text-sm font-semibold rounded-lg hover:bg-zinc-100" disabled={isSubmitting}>Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md flex items-center gap-2 disabled:opacity-50">
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isSubmitting ? "Adding..." : "Add Contact"}
+                </button>
               </div>
             </form>
           </div>
@@ -551,6 +607,40 @@ export default function ContactsPage() {
               </div>
             )}
 
+          </div>
+        </div>
+      )}
+
+      {/* Import Result Modal */}
+      {addModalType === "ImportResult" && importResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-zinc-900/40 backdrop-blur-sm" onClick={() => setAddModalType(null)} />
+          <div className="relative bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-8 text-center">
+              <div className="h-16 w-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                <CheckCircle2 className="h-8 w-8" />
+              </div>
+              <h3 className="text-xl font-bold text-zinc-900 mb-2">Import Completed!</h3>
+              <p className="text-zinc-500 mb-6">
+                We successfully processed your contacts.
+              </p>
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-100">
+                  <div className="text-2xl font-bold text-emerald-600">{importResult.inserted}</div>
+                  <div className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Inserted</div>
+                </div>
+                <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-100">
+                  <div className="text-2xl font-bold text-amber-600">{importResult.skipped}</div>
+                  <div className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Skipped</div>
+                </div>
+              </div>
+              <button 
+                onClick={() => setAddModalType(null)}
+                className="w-full py-3 bg-zinc-900 text-white font-semibold rounded-xl hover:bg-zinc-800 transition-colors"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}
