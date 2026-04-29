@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { 
   ChevronDown, 
   MoreHorizontal, 
@@ -20,10 +20,15 @@ import {
   RotateCcw,
   Users,
   Loader2,
-  Save
+  Save,
+  Rocket,
+  X,
+  Search
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
+import { launchCampaign } from "@/lib/actions/scheduler";
+import { getContacts, type Contact } from "@/lib/actions/contacts";
 
 interface Step {
   id: string;
@@ -44,6 +49,7 @@ interface Campaign {
 
 export default function SequenceDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const campaignId = params.id as string;
   const supabase = createClient();
 
@@ -54,6 +60,14 @@ export default function SequenceDetailPage() {
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  
+  // Launch / Contact Picker State
+  const [isLaunchModalOpen, setIsLaunchModalOpen] = useState(false);
+  const [allContacts, setAllContacts] = useState<Contact[]>([]);
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isLaunching, setIsLaunching] = useState(false);
+  const [launchResult, setLaunchResult] = useState<{ queued: number; error: string | null } | null>(null);
 
   useEffect(() => {
     if (campaignId) {
@@ -101,21 +115,15 @@ export default function SequenceDetailPage() {
 
   async function handleSave() {
     if (!campaign) return;
+    if (!campaign.account_id) {
+      alert('Please select a sender account first.');
+      return;
+    }
     setIsSaving(true);
 
     try {
-      // 1. Update Campaign (e.g., status or account_id)
-      await supabase
-        .from('campaigns')
-        .update({ 
-          status: 'active',
-          account_id: campaign.account_id 
-        })
-        .eq('id', campaignId);
-
-      // 2. Delete existing steps and re-insert (simple way to sync)
+      // Save steps
       await supabase.from('campaign_steps').delete().eq('campaign_id', campaignId);
-
       const stepsToInsert = steps.map((step, idx) => ({
         campaign_id: campaignId,
         position: idx,
@@ -123,17 +131,43 @@ export default function SequenceDetailPage() {
         body: step.type === 'email' ? step.body : null,
         wait_days: step.type === 'wait' ? parseInt(step.duration?.split(' ')[0] || '1') : null,
       }));
-
       await supabase.from('campaign_steps').insert(stepsToInsert);
+
+      // Update account
+      await supabase
+        .from('campaigns')
+        .update({ account_id: campaign.account_id })
+        .eq('id', campaignId);
 
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
     } catch (err) {
-      console.error("Failed to save sequence:", err);
+      console.error('Failed to save:', err);
     } finally {
       setIsSaving(false);
     }
   }
+
+  const handleLaunchClick = async () => {
+    setIsLaunchModalOpen(true);
+    setLaunchResult(null);
+    const { data } = await getContacts();
+    if (data) setAllContacts(data);
+  };
+
+  const handleLaunchCampaign = async () => {
+    if (selectedContactIds.length === 0) return;
+    setIsLaunching(true);
+    const result = await launchCampaign(campaignId, selectedContactIds);
+    setLaunchResult(result);
+    setIsLaunching(false);
+    if (!result.error) {
+      setTimeout(() => {
+        setIsLaunchModalOpen(false);
+        router.refresh();
+      }, 3000);
+    }
+  };
 
   const addStep = (type: "email" | "wait") => {
     const newId = `new-${Date.now()}`;
@@ -166,12 +200,16 @@ export default function SequenceDetailPage() {
     );
   }
 
-  // Auditing logic (simplified for real data)
   const currentStep = steps.find(s => s.id === activeStepId);
   const currentEmailBody = currentStep?.body || "";
   const linkCount = (currentEmailBody.match(/http/g) || []).length;
   const hasUnsubscribe = currentEmailBody.toLowerCase().includes("unsubscribe");
   const auditScore = Math.max(0, 100 - (linkCount > 1 ? 15 : 0) - (!hasUnsubscribe ? 10 : 0));
+
+  const filteredContacts = allContacts.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    c.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-inter relative">
@@ -179,7 +217,7 @@ export default function SequenceDetailPage() {
       {showToast && (
         <div className="absolute top-10 left-1/2 -translate-x-1/2 z-[100] bg-zinc-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
           <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-          <span className="text-sm font-bold tracking-tight">Sequence saved and launched!</span>
+          <span className="text-sm font-bold tracking-tight">Sequence saved successfully!</span>
         </div>
       )}
 
@@ -207,14 +245,25 @@ export default function SequenceDetailPage() {
           <div className="flex items-center gap-3">
             <button 
               onClick={handleSave}
-              disabled={isSaving || !campaign?.account_id}
+              disabled={isSaving}
               className={cn(
-                "bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-500/25 transition-all text-sm active:scale-[0.98] flex items-center gap-2",
-                (isSaving || !campaign?.account_id) && "opacity-80 cursor-not-allowed"
+                "bg-zinc-900 hover:bg-zinc-800 text-white px-5 py-2.5 rounded-xl font-bold transition-all text-sm active:scale-[0.98] flex items-center gap-2",
+                isSaving && "opacity-80 cursor-not-allowed"
               )}
             >
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {isSaving ? "Saving..." : "Save & Launch"}
+              {isSaving ? "Saving..." : "Save Changes"}
+            </button>
+            <button 
+              onClick={handleLaunchClick}
+              disabled={isSaving || !campaign?.account_id || steps.filter(s => s.type === 'email').length === 0}
+              className={cn(
+                "bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-500/25 transition-all text-sm active:scale-[0.98] flex items-center gap-2",
+                (!campaign?.account_id || steps.filter(s => s.type === 'email').length === 0) && "opacity-50 cursor-not-allowed grayscale"
+              )}
+            >
+              <Rocket className="h-4 w-4" />
+              Launch Campaign
             </button>
           </div>
         </header>
@@ -364,6 +413,112 @@ export default function SequenceDetailPage() {
              </p>
           </div>
       </aside>
+
+      {/* Launch Modal */}
+      {isLaunchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-zinc-900/40 backdrop-blur-sm" onClick={() => !isLaunching && setIsLaunchModalOpen(false)} />
+          <div className="relative bg-white w-full max-w-xl rounded-3xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-8 py-5 border-b border-zinc-100">
+              <h2 className="text-xl font-black text-zinc-900 tracking-tight">Launch Campaign</h2>
+              <button 
+                onClick={() => setIsLaunchModalOpen(false)} 
+                className="p-2 hover:bg-zinc-100 rounded-full text-zinc-400 transition-colors"
+                disabled={isLaunching}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-8">
+              {launchResult ? (
+                <div className="text-center py-10 space-y-4">
+                  {launchResult.error ? (
+                    <>
+                      <div className="h-16 w-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto">
+                        <AlertTriangle className="h-8 w-8" />
+                      </div>
+                      <h3 className="text-lg font-bold text-zinc-900">Launch Failed</h3>
+                      <p className="text-sm text-red-500 font-medium">{launchResult.error}</p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="h-16 w-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto">
+                        <CheckCircle2 className="h-8 w-8" />
+                      </div>
+                      <h3 className="text-lg font-bold text-zinc-900">Campaign Launched!</h3>
+                      <p className="text-sm text-zinc-500 font-bold">{launchResult.queued} emails queued successfully.</p>
+                      <p className="text-[10px] text-zinc-400 uppercase tracking-widest font-black pt-2">Closing in a few seconds...</p>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Select Contacts</label>
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                      <input 
+                        type="text" 
+                        placeholder="Search contacts..." 
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl pl-11 pr-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20" 
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="max-h-[300px] overflow-y-auto border border-zinc-100 rounded-2xl divide-y divide-zinc-50 no-scrollbar">
+                    {filteredContacts.length > 0 ? filteredContacts.map(contact => (
+                      <label key={contact.id} className="flex items-center gap-3 p-4 hover:bg-zinc-50 cursor-pointer transition-colors">
+                        <input 
+                          type="checkbox" 
+                          className="h-5 w-5 rounded-lg border-zinc-300 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
+                          checked={selectedContactIds.includes(contact.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedContactIds([...selectedContactIds, contact.id]);
+                            else setSelectedContactIds(selectedContactIds.filter(id => id !== contact.id));
+                          }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-zinc-900 truncate">{contact.name}</p>
+                          <p className="text-[11px] text-zinc-400 font-medium truncate">{contact.email}</p>
+                        </div>
+                      </label>
+                    )) : (
+                      <div className="p-10 text-center text-zinc-400 text-sm font-bold">
+                        No contacts found
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-4">
+                    <p className="text-xs font-bold text-zinc-500">
+                      {selectedContactIds.length} contacts selected
+                    </p>
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={() => setIsLaunchModalOpen(false)}
+                        className="px-6 py-2.5 text-sm font-bold text-zinc-500 hover:bg-zinc-100 rounded-xl transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        onClick={handleLaunchCampaign}
+                        disabled={selectedContactIds.length === 0 || isLaunching}
+                        className="flex items-center gap-2 bg-blue-600 text-white px-8 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 disabled:grayscale"
+                      >
+                        {isLaunching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
+                        {isLaunching ? "Launching..." : "Confirm Launch"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

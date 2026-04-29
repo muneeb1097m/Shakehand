@@ -21,3 +21,41 @@ CREATE TABLE IF NOT EXISTS templates (
 
 ALTER TABLE templates ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can manage own templates." ON templates FOR ALL USING (auth.uid() = user_id);
+
+-- Email queue table
+CREATE TABLE IF NOT EXISTS email_queue (
+  id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id       UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+  campaign_id   UUID REFERENCES campaigns ON DELETE CASCADE NOT NULL,
+  contact_id    UUID REFERENCES contacts ON DELETE CASCADE NOT NULL,
+  account_id    UUID REFERENCES email_accounts ON DELETE CASCADE NOT NULL,
+  step_position INTEGER NOT NULL DEFAULT 0,
+  subject       TEXT NOT NULL,
+  body          TEXT NOT NULL,
+  status        TEXT DEFAULT 'pending', -- 'pending' | 'sent' | 'failed'
+  scheduled_at  TIMESTAMP WITH TIME ZONE NOT NULL,
+  sent_at       TIMESTAMP WITH TIME ZONE,
+  error_message TEXT,
+  created_at    TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+ALTER TABLE email_queue ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage own queue." ON email_queue FOR ALL USING (auth.uid() = user_id);
+CREATE INDEX IF NOT EXISTS email_queue_status_idx ON email_queue (status, scheduled_at);
+
+-- campaign_contacts: tracks which contacts are in which campaign
+CREATE TABLE IF NOT EXISTS campaign_contacts (
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  campaign_id UUID REFERENCES campaigns ON DELETE CASCADE NOT NULL,
+  contact_id  UUID REFERENCES contacts ON DELETE CASCADE NOT NULL,
+  status      TEXT DEFAULT 'active', -- 'active' | 'completed' | 'unsubscribed' | 'bounced'
+  added_at    TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
+  UNIQUE(campaign_id, contact_id)
+);
+
+ALTER TABLE campaign_contacts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage campaign contacts." ON campaign_contacts FOR ALL
+USING (EXISTS (SELECT 1 FROM campaigns WHERE id = campaign_id AND user_id = auth.uid()));
+
+-- Enable pg_cron extension (only needed once)
+CREATE EXTENSION IF NOT EXISTS pg_cron;
