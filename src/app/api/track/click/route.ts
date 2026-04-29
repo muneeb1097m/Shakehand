@@ -19,5 +19,16 @@ export async function GET(request: Request) {
     return new NextResponse('Missing url', { status: 400 })
   }
 
+  // Validate URL to prevent protocol injection
+  const allowedProtocols = ['http:', 'https:']
+  try {
+    const parsed = new URL(destination)
+    if (!allowedProtocols.includes(parsed.protocol)) {
+      return new NextResponse('Invalid URL', { status: 400 })
+    }
+  } catch {
+    return new NextResponse('Invalid URL', { status: 400 })
+  }
+
   return NextResponse.redirect(destination)
 }

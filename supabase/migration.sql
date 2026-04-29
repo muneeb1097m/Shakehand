@@ -76,3 +76,10 @@ CREATE TABLE IF NOT EXISTS suppression_list (
 CREATE UNIQUE INDEX IF NOT EXISTS suppression_user_email_idx ON suppression_list (user_id, email);
 ALTER TABLE suppression_list ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can manage own suppression list." ON suppression_list FOR ALL USING (auth.uid() = user_id);
+
+-- Reset daily send count every midnight
+SELECT cron.schedule(
+  'reset-daily-send-count',
+  '0 0 * * *',
+  66625 UPDATE email_accounts SET sent_today = 0 66625
+);
