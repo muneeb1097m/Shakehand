@@ -7,3 +7,17 @@ ALTER TABLE email_accounts ADD COLUMN IF NOT EXISTS sent_today INTEGER DEFAULT 0
 -- Add reputation score if not exists
 ALTER TABLE email_accounts ADD COLUMN IF NOT EXISTS health_score INTEGER DEFAULT 100;
 ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS account_id UUID REFERENCES email_accounts(id) ON DELETE SET NULL;
+
+CREATE TABLE IF NOT EXISTS templates (
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id     UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+  name        TEXT NOT NULL,
+  subject     TEXT NOT NULL,
+  body        TEXT NOT NULL,
+  category    TEXT DEFAULT 'Outreach',
+  created_at  TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
+  updated_at  TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+ALTER TABLE templates ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage own templates." ON templates FOR ALL USING (auth.uid() = user_id);
