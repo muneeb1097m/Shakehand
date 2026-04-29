@@ -28,27 +28,14 @@ import {
   Line
 } from "recharts";
 
-const performanceData = [
-  { name: "Day 1", value: 10 },
-  { name: "Day 7", value: 25 },
-  { name: "Day 14", value: 45 },
-  { name: "Day 21", value: 35 },
-  { name: "Today", value: 65 },
-];
-
-const miniChartData = [
-  { name: "1", value: 40 },
-  { name: "2", value: 30 },
-  { name: "3", value: 45 },
-  { name: "4", value: 35 },
-  { name: "5", value: 55 },
-];
+const performanceData: any[] = [];
+const miniChartData: any[] = [];
 
 const stats = [
   { 
     label: "Total Sent", 
-    value: "12,450", 
-    change: "+12.4%", 
+    value: "0", 
+    change: "--", 
     trend: "up", 
     icon: Send,
     iconColor: "text-blue-600",
@@ -56,8 +43,8 @@ const stats = [
   },
   { 
     label: "Open Rate", 
-    value: "68.2%", 
-    change: "+2.1%", 
+    value: "0%", 
+    change: "--", 
     trend: "up", 
     icon: MailOpen,
     iconColor: "text-emerald-600",
@@ -65,17 +52,17 @@ const stats = [
   },
   { 
     label: "Click Rate", 
-    value: "12.5%", 
-    change: "-0.5%", 
-    trend: "down", 
+    value: "0%", 
+    change: "--", 
+    trend: "up", 
     icon: MousePointer2,
     iconColor: "text-indigo-600",
     iconBg: "bg-indigo-50"
   },
   { 
     label: "Reply Rate", 
-    value: "4.8%", 
-    change: "+1.1%", 
+    value: "0%", 
+    change: "--", 
     trend: "up", 
     icon: RotateCcw,
     iconColor: "text-orange-600",
@@ -83,41 +70,7 @@ const stats = [
   },
 ];
 
-const sequences = [
-  {
-    name: "Outbound Q3 - SaaS Founders",
-    updated: "Last updated 2h ago",
-    status: "Active",
-    leads: "1,240",
-    openRate: "72%",
-    icon: "bg-blue-100 text-blue-600",
-    performance: [
-      { v: 10 }, { v: 15 }, { v: 12 }, { v: 25 }, { v: 22 }, { v: 30 }, { v: 28 }
-    ]
-  },
-  {
-    name: "Webinar Follow-up - Series A",
-    updated: "Last updated 5h ago",
-    status: "Paused",
-    leads: "456",
-    openRate: "54%",
-    icon: "bg-orange-100 text-orange-600",
-    performance: [
-      { v: 20 }, { v: 18 }, { v: 15 }, { v: 12 }, { v: 14 }, { v: 10 }, { v: 8 }
-    ]
-  },
-  {
-    name: "Cold Reach - HR Leaders",
-    updated: "Last updated 2 days ago",
-    status: "Active",
-    leads: "2,118",
-    openRate: "61%",
-    icon: "bg-emerald-100 text-emerald-600",
-    performance: [
-      { v: 5 }, { v: 12 }, { v: 18 }, { v: 15 }, { v: 25 }, { v: 35 }, { v: 45 }
-    ]
-  }
-];
+const sequences: any[] = [];
 
 const CircularProgress = ({ percent, label, status, colorClass }: any) => {
   const radius = 36;
@@ -291,7 +244,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800">
-                {sequences.map((seq) => (
+                {sequences.length > 0 ? sequences.map((seq) => (
                   <tr key={seq.name} className="group hover:bg-zinc-50/50 dark:hover:bg-zinc-800/50 transition-colors">
                     <td className="py-5">
                       <div className="flex items-center gap-4">
@@ -344,7 +297,13 @@ export default function DashboardPage() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-zinc-400 font-bold">
+                      No active sequences yet
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

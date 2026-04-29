@@ -15,44 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const templates = [
-  {
-    id: 1,
-    name: "SaaS Problem/Solution",
-    subject: "Hate {{problem}}? We solved it for {{company}}",
-    preview: "Hey {{firstName}}, I noticed that {{company}} is currently dealing with...",
-    category: "Outreach",
-    rating: 4.8,
-    usage: 1240
-  },
-  {
-    id: 2,
-    name: "AI Personalization",
-    subject: "Quick question about {{jobTitle}} at {{company}}",
-    preview: "Hi {{firstName}}, I saw your recent post about AI in {{industry}} and...",
-    category: "Personalized",
-    rating: 4.9,
-    usage: 856
-  },
-  {
-    id: 3,
-    name: "Follow-up: Gentle Nudge",
-    subject: "Re: Quick question about {{jobTitle}}",
-    preview: "Hi {{firstName}}, just wanted to bubble this up in case it got buried...",
-    category: "Follow-up",
-    rating: 4.5,
-    usage: 3200
-  },
-  {
-    id: 4,
-    name: "Case Study Drop",
-    subject: "How we helped {{similarCompany}} reach {{metric}}",
-    preview: "Hey {{firstName}}, I follow your work at {{company}} and thought you might...",
-    category: "Social Proof",
-    rating: 4.7,
-    usage: 540
-  }
-];
+const templates: any[] = [];
 
 export default function TemplatesPage() {
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -92,7 +55,7 @@ export default function TemplatesPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {templates.map((template) => (
+        {templates.length > 0 ? templates.map((template) => (
           <div key={template.id} className="group p-6 rounded-3xl border border-border bg-card/50 backdrop-blur-sm hover:shadow-xl hover:border-primary/20 transition-all duration-300">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
@@ -140,7 +103,12 @@ export default function TemplatesPage() {
               </div>
             </div>
           </div>
-        ))}
+        )) : (
+          <div className="col-span-full py-20 text-center bg-card/30 border border-border border-dashed rounded-3xl">
+             <Mail className="h-10 w-10 text-zinc-300 mx-auto mb-4" />
+             <p className="text-zinc-400 font-bold">No templates yet. Click Create Template to get started.</p>
+          </div>
+        )}
       </div>
       </div>
     </div>

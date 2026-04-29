@@ -21,57 +21,7 @@ interface Thread {
   messages: Message[];
 }
 
-const initialThreads: Thread[] = [
-  {
-    id: "t1",
-    contact: { name: "Marcus Webb", email: "marcus@techflow.io", company: "TechFlow Inc", initials: "MW" },
-    campaign: "Q1 SaaS Outreach", status: "interested", isRead: false, lastTime: "10:42 AM",
-    preview: "Hey, this looks really interesting! I'd love to learn more about how you can help us...",
-    messages: [
-      { id: "m1", from: "Alex Johnson", fromEmail: "alex@yourdomain.com", body: "Hi Marcus,\n\nI noticed your work at TechFlow and wanted to reach out. We've been helping SaaS companies automate their outreach workflows — could we get 15 minutes?\n\nBest, Alex", time: "Yesterday, 9:00 AM", isFromContact: false },
-      { id: "m2", from: "Marcus Webb", fromEmail: "marcus@techflow.io", body: "Hey Alex,\n\nThis looks really interesting! I'd love to learn more about how you can help us scale outreach. We've been struggling with deliverability lately.\n\nAre you free Thursday afternoon?\n\nMarcus", time: "Today, 10:42 AM", isFromContact: true }
-    ]
-  },
-  {
-    id: "t2",
-    contact: { name: "Priya Sharma", email: "priya@nexuslabs.co", company: "Nexus Labs", initials: "PS" },
-    campaign: "Enterprise Founders", status: "meeting_booked", isRead: true, lastTime: "9:15 AM",
-    preview: "I've sent a calendar invite for Tuesday at 2pm EST. Looking forward to it!",
-    messages: [
-      { id: "m3", from: "Alex Johnson", fromEmail: "alex@yourdomain.com", body: "Hi Priya,\n\nSaw your post on scaling sales at Nexus Labs. We help enterprise teams get 3x reply rates through better personalization.\n\nWorth a quick chat?\n\nAlex", time: "Mon, 8:00 AM", isFromContact: false },
-      { id: "m4", from: "Priya Sharma", fromEmail: "priya@nexuslabs.co", body: "Hi Alex, sounds great! Calendar invite sent for Tuesday 2pm EST. Looking forward to seeing your platform.", time: "Today, 9:15 AM", isFromContact: true }
-    ]
-  },
-  {
-    id: "t3",
-    contact: { name: "Jordan Ellis", email: "j.ellis@coldstream.com", company: "Coldstream", initials: "JE" },
-    campaign: "Cold Reach - HR", status: "not_interested", isRead: true, lastTime: "Yesterday",
-    preview: "Thanks but we're not looking for new tools right now. Please remove me from your list.",
-    messages: [
-      { id: "m5", from: "Alex Johnson", fromEmail: "alex@yourdomain.com", body: "Hi Jordan,\n\nI work with several HR leaders who've cut time-to-hire significantly with automated outreach...", time: "3 days ago", isFromContact: false },
-      { id: "m6", from: "Jordan Ellis", fromEmail: "j.ellis@coldstream.com", body: "Thanks for reaching out but we're not looking for any new tools right now. Please remove me from your list.", time: "Yesterday, 3:20 PM", isFromContact: true }
-    ]
-  },
-  {
-    id: "t4",
-    contact: { name: "Sam Torres", email: "sam.t@orbitgrowth.com", company: "Orbit Growth", initials: "ST" },
-    campaign: "Q1 SaaS Outreach", status: "new", isRead: false, lastTime: "8:02 AM",
-    preview: "Could you tell me more about pricing? We have about 50 reps who would use this.",
-    messages: [
-      { id: "m7", from: "Alex Johnson", fromEmail: "alex@yourdomain.com", body: "Hi Sam,\n\nI've been following Orbit Growth's impressive trajectory...\n\nWould love to show you how we can help scale outreach.\n\nAlex", time: "Yesterday, 2:00 PM", isFromContact: false },
-      { id: "m8", from: "Sam Torres", fromEmail: "sam.t@orbitgrowth.com", body: "Interesting! Could you tell me a bit more about the pricing structure? We have about 50 reps who would be using this.", time: "Today, 8:02 AM", isFromContact: true }
-    ]
-  },
-  {
-    id: "t5",
-    contact: { name: "Aisha Okafor", email: "aisha@brightmind.ai", company: "BrightMind AI", initials: "AO" },
-    campaign: "Webinar Follow-up", status: "new", isRead: false, lastTime: "Yesterday",
-    preview: "Had a follow-up question about the automation feature you demoed in the webinar.",
-    messages: [
-      { id: "m9", from: "Aisha Okafor", fromEmail: "aisha@brightmind.ai", body: "Hi Alex,\n\nAttended your webinar yesterday — great stuff! Had a follow-up question about the automation feature you demoed. Can we sync this week?\n\nAisha", time: "Yesterday, 4:00 PM", isFromContact: true }
-    ]
-  }
-];
+const initialThreads: Thread[] = [];
 
 const statusConfig: Record<ThreadStatus, { label: string; color: string; bg: string; dot: string }> = {
   new: { label: "New Reply", color: "text-blue-600", bg: "bg-blue-50", dot: "bg-blue-500" },
@@ -85,14 +35,14 @@ const filterTabs = ["All", "New", "Interested", "Meeting", "Not Interested"];
 
 export default function InboxPage() {
   const [threads, setThreads] = useState<Thread[]>(initialThreads);
-  const [selectedId, setSelectedId] = useState("t1");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isAIWriting, setIsAIWriting] = useState(false);
 
-  const selectedThread = threads.find(t => t.id === selectedId)!;
+  const selectedThread = threads.find(t => t.id === selectedId);
 
   const filtered = threads.filter(t => {
     const matchFilter = activeFilter === "All"
@@ -114,6 +64,7 @@ export default function InboxPage() {
   };
 
   const handleAI = () => {
+    if (!selectedThread) return;
     setIsAIWriting(true);
     setTimeout(() => {
       setReplyText(`Hi ${selectedThread.contact.name.split(" ")[0]},\n\nThanks for getting back to me! Thursday afternoon works perfectly.\n\nI'll send a calendar invite now — excited to show you how we can help ${selectedThread.contact.company} scale outreach.\n\nBest,\nAlex`);
@@ -183,7 +134,7 @@ export default function InboxPage() {
         </div>
 
         {/* Right: Thread Detail */}
-        {selectedThread && (
+        {selectedThread ? (
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Thread Header */}
             <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-zinc-200">
@@ -253,6 +204,16 @@ export default function InboxPage() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center bg-zinc-50/30">
+            <div className="text-center space-y-4">
+              <div className="h-20 w-20 bg-white border border-zinc-100 rounded-3xl flex items-center justify-center mx-auto shadow-sm">
+                <Mail className="h-10 w-10 text-zinc-300" />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900">No replies yet</h3>
+              <p className="text-sm text-zinc-400 max-w-[240px] mx-auto">Select a conversation from the left to start replying to your leads.</p>
             </div>
           </div>
         )}

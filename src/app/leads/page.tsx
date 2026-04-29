@@ -16,44 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const leads = [
-  {
-    id: 1,
-    name: "Thomas Anderson",
-    company: "Meta Cortex",
-    email: "t.anderson@metacortex.com",
-    status: "replied",
-    campaign: "Q1 SaaS Outreach",
-    lastActivity: "2 hours ago"
-  },
-  {
-    id: 2,
-    name: "Sarah Connor",
-    company: "Cyberdyne Systems",
-    email: "sarah@cyberdyne.org",
-    status: "interested",
-    campaign: "Q1 SaaS Outreach",
-    lastActivity: "5 hours ago"
-  },
-  {
-    id: 3,
-    name: "Bruce Wayne",
-    company: "Wayne Enterprises",
-    email: "bruce@waynecorp.com",
-    status: "contacted",
-    campaign: "Enterprise Founders",
-    lastActivity: "1 day ago"
-  },
-  {
-    id: 4,
-    name: "Ellen Ripley",
-    company: "Weyland-Yutani",
-    email: "ripley@weyland.com",
-    status: "contacted",
-    campaign: "Enterprise Founders",
-    lastActivity: "2 days ago"
-  }
-];
+const leads: any[] = [];
 
 export default function LeadsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -117,7 +80,7 @@ export default function LeadsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {leads.map((lead) => (
+            {leads.length > 0 ? leads.map((lead) => (
               <tr key={lead.id} className="group hover:bg-muted/30 transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
@@ -156,7 +119,13 @@ export default function LeadsPage() {
                   </button>
                 </td>
               </tr>
-            ))}
+            )) : (
+              <tr>
+                <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground font-bold">
+                  No leads yet
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

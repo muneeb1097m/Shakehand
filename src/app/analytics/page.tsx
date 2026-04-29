@@ -26,19 +26,8 @@ import {
   Cell
 } from "recharts";
 
-const performanceData = [
-  { name: "Week 1", sent: 1200, opened: 800, replied: 120 },
-  { name: "Week 2", sent: 1500, opened: 950, replied: 180 },
-  { name: "Week 3", sent: 1100, opened: 700, replied: 90 },
-  { name: "Week 4", sent: 2000, opened: 1400, replied: 310 },
-];
-
-const sourceData = [
-  { name: "LinkedIn", value: 4500 },
-  { name: "Direct Import", value: 3000 },
-  { name: "Web Scraping", value: 2000 },
-  { name: "Referrals", value: 500 },
-];
+const performanceData: any[] = [];
+const sourceData: any[] = [];
 
 const COLORS = ["#6366f1", "#a855f7", "#ec4899", "#f59e0b"];
 
@@ -142,10 +131,9 @@ export default function AnalyticsPage() {
             </div>
             <h4 className="font-bold">Conversion Rate</h4>
           </div>
-          <p className="text-3xl font-bold">12.4%</p>
-          <div className="flex items-center gap-2 mt-2 text-emerald-500 text-sm font-medium">
-            <TrendingUp className="h-4 w-4" />
-            +2.1% from last month
+          <p className="text-3xl font-bold">0%</p>
+          <div className="flex items-center gap-2 mt-2 text-zinc-400 text-sm font-medium">
+            --
           </div>
         </div>
         <div className="p-6 rounded-3xl border border-border bg-card/50 backdrop-blur-sm">
@@ -155,10 +143,9 @@ export default function AnalyticsPage() {
             </div>
             <h4 className="font-bold">Active Sequences</h4>
           </div>
-          <p className="text-3xl font-bold">24</p>
-          <div className="flex items-center gap-2 mt-2 text-rose-500 text-sm font-medium">
-            <TrendingDown className="h-4 w-4" />
-            -4 from last month
+          <p className="text-3xl font-bold">0</p>
+          <div className="flex items-center gap-2 mt-2 text-zinc-400 text-sm font-medium">
+            --
           </div>
         </div>
         <div className="p-6 rounded-3xl border border-border bg-card/50 backdrop-blur-sm">
@@ -168,10 +155,9 @@ export default function AnalyticsPage() {
             </div>
             <h4 className="font-bold">Response Time</h4>
           </div>
-          <p className="text-3xl font-bold">4.2h</p>
-          <div className="flex items-center gap-2 mt-2 text-emerald-500 text-sm font-medium">
-            <TrendingUp className="h-4 w-4" />
-            -30m from last month
+          <p className="text-3xl font-bold">0h</p>
+          <div className="flex items-center gap-2 mt-2 text-zinc-400 text-sm font-medium">
+            --
           </div>
         </div>
       </div>
