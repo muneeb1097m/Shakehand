@@ -1,5 +1,7 @@
 "use client";
 
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { 
@@ -15,7 +17,9 @@ import {
   MoreVertical,
   Plus,
   Flame,
-  Info
+  Info,
+  Loader2,
+  ExternalLink
 } from "lucide-react";
 import { 
   AreaChart, 
@@ -28,50 +32,9 @@ import {
   LineChart,
   Line
 } from "recharts";
+import { getDashboardStats } from "@/lib/actions/dashboard";
 
 const performanceData: any[] = [];
-const miniChartData: any[] = [];
-
-const stats = [
-  { 
-    label: "Total Sent", 
-    value: "0", 
-    change: "--", 
-    trend: "up", 
-    icon: Send,
-    iconColor: "text-blue-600",
-    iconBg: "bg-blue-50"
-  },
-  { 
-    label: "Open Rate", 
-    value: "0%", 
-    change: "--", 
-    trend: "up", 
-    icon: MailOpen,
-    iconColor: "text-emerald-600",
-    iconBg: "bg-emerald-50"
-  },
-  { 
-    label: "Click Rate", 
-    value: "0%", 
-    change: "--", 
-    trend: "up", 
-    icon: MousePointer2,
-    iconColor: "text-indigo-600",
-    iconBg: "bg-indigo-50"
-  },
-  { 
-    label: "Reply Rate", 
-    value: "0%", 
-    change: "--", 
-    trend: "up", 
-    icon: RotateCcw,
-    iconColor: "text-orange-600",
-    iconBg: "bg-orange-50"
-  },
-];
-
-const sequences: any[] = [];
 
 const CircularProgress = ({ percent, label, status, colorClass }: any) => {
   const radius = 36;
@@ -119,6 +82,18 @@ const CircularProgress = ({ percent, label, status, colorClass }: any) => {
 }
 
 export default function DashboardPage() {
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadStats() {
+      const data = await getDashboardStats();
+      if (data) setStats(data);
+      setLoading(false);
+    }
+    loadStats();
+  }, []);
+
   const headerActions = (
     <button className="flex items-center gap-2 px-4 py-2 rounded-xl border border-zinc-200 bg-white shadow-sm hover:bg-zinc-50 transition-all">
       <ArrowLeftRight className="h-4 w-4 text-blue-600" />
@@ -126,6 +101,45 @@ export default function DashboardPage() {
       <ChevronDown className="h-4 w-4 text-zinc-400" />
     </button>
   );
+
+  const statCards = [
+    { 
+      label: "Total Sent", 
+      value: loading ? "--" : stats?.totalSent ?? "0", 
+      change: "--", 
+      trend: "up", 
+      icon: Send,
+      iconColor: "text-blue-600",
+      iconBg: "bg-blue-50"
+    },
+    { 
+      label: "Open Rate", 
+      value: loading ? "--" : stats?.openRate ?? "0%", 
+      change: "--", 
+      trend: "up", 
+      icon: MailOpen,
+      iconColor: "text-emerald-600",
+      iconBg: "bg-emerald-50"
+    },
+    { 
+      label: "Click Rate", 
+      value: loading ? "--" : stats?.clickRate ?? "0%", 
+      change: "--", 
+      trend: "up", 
+      icon: MousePointer2,
+      iconColor: "text-indigo-600",
+      iconBg: "bg-indigo-50"
+    },
+    { 
+      label: "Reply Rate", 
+      value: loading ? "--" : stats?.replyRate ?? "0%", 
+      change: "--", 
+      trend: "up", 
+      icon: RotateCcw,
+      iconColor: "text-orange-600",
+      iconBg: "bg-orange-50"
+    },
+  ];
 
   return (
     <div className="flex flex-col min-h-screen bg-zinc-50/50 dark:bg-zinc-950">
@@ -165,7 +179,7 @@ export default function DashboardPage() {
 
         {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat) => (
+          {statCards.map((stat) => (
             <div key={stat.label} className="p-6 rounded-[2rem] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm transition-all hover:shadow-md">
               <div className="flex items-center justify-between mb-4">
                 <div className={cn("p-2.5 rounded-xl", stat.iconBg)}>
@@ -190,10 +204,10 @@ export default function DashboardPage() {
         <div className="p-8 rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">Active Sequences</h3>
-            <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 transition-all">
+            <Link href="/campaigns" className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 transition-all">
               <Plus className="h-4 w-4" />
               New Sequence
-            </button>
+            </Link>
           </div>
           
           <div className="overflow-x-auto">
@@ -202,68 +216,50 @@ export default function DashboardPage() {
                 <tr className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800">
                   <th className="pb-4 font-bold">Sequence Name</th>
                   <th className="pb-4 font-bold text-center">Status</th>
-                  <th className="pb-4 font-bold text-center">Total Leads</th>
-                  <th className="pb-4 font-bold text-center">Performance</th>
+                  <th className="pb-4 font-bold text-center">Date Created</th>
                   <th className="pb-4 font-bold text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800">
-                {sequences.length > 0 ? sequences.map((seq) => (
-                  <tr key={seq.name} className="group hover:bg-zinc-50/50 dark:hover:bg-zinc-800/50 transition-colors">
+                {loading ? (
+                  <tr>
+                    <td colSpan={4} className="py-12 text-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-zinc-300 mx-auto" />
+                    </td>
+                  </tr>
+                ) : stats?.activeCampaigns?.length > 0 ? stats.activeCampaigns.map((seq: any) => (
+                  <tr key={seq.id} className="group hover:bg-zinc-50/50 dark:hover:bg-zinc-800/50 transition-colors">
                     <td className="py-5">
                       <div className="flex items-center gap-4">
-                        <div className={cn("h-10 w-10 flex items-center justify-center rounded-xl", seq.icon)}>
-                          {seq.name.includes("Outbound") ? <ArrowUpRight className="h-5 w-5" /> : 
-                           seq.name.includes("Webinar") ? <Mail className="h-5 w-5" /> : 
-                           <Users className="h-5 w-5" />}
+                        <div className={cn("h-10 w-10 flex items-center justify-center rounded-xl bg-blue-50 text-blue-600")}>
+                          <Mail className="h-5 w-5" />
                         </div>
                         <div className="flex flex-col">
                           <span className="font-bold text-zinc-900 dark:text-white">{seq.name}</span>
-                          <span className="text-[10px] font-medium text-zinc-400">{seq.updated}</span>
+                          <span className="text-[10px] font-medium text-zinc-400">Campaign ID: {seq.id.split('-')[0]}</span>
                         </div>
                       </div>
                     </td>
                     <td className="py-5">
                       <div className="flex items-center justify-center gap-2">
-                        <div className={cn("h-2 w-2 rounded-full", seq.status === "Active" ? "bg-emerald-500" : "bg-zinc-300")} />
-                        <span className={cn("text-xs font-bold", seq.status === "Active" ? "text-emerald-500" : "text-zinc-400")}>
+                        <div className={cn("h-2 w-2 rounded-full", seq.status === "active" ? "bg-emerald-500" : "bg-zinc-300")} />
+                        <span className={cn("text-xs font-bold capitalize", seq.status === "active" ? "text-emerald-500" : "text-zinc-400")}>
                           {seq.status}
                         </span>
                       </div>
                     </td>
-                    <td className="py-5 text-center font-bold text-zinc-700 dark:text-zinc-300">
-                      {seq.leads}
-                    </td>
-                    <td className="py-5">
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="flex items-center gap-1">
-                           <span className="text-[10px] font-bold text-zinc-400 uppercase">Open</span>
-                           <span className="text-xs font-black text-zinc-900 dark:text-zinc-100">{seq.openRate}</span>
-                        </div>
-                        <div className="h-8 w-16">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={seq.performance}>
-                              <Line 
-                                type="monotone" 
-                                dataKey="v" 
-                                stroke={seq.status === "Active" ? "#3b82f6" : "#a1a1aa"} 
-                                strokeWidth={2} 
-                                dot={false} 
-                              />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
+                    <td className="py-5 text-center font-bold text-zinc-700 dark:text-zinc-300 text-xs">
+                      {new Date(seq.created_at).toLocaleDateString()}
                     </td>
                     <td className="py-5 text-right">
-                      <button className="p-2 text-zinc-300 hover:text-zinc-600 transition-colors">
-                        <MoreVertical className="h-5 w-5" />
-                      </button>
+                      <Link href={`/campaigns/${seq.id}`} className="p-2 text-zinc-300 hover:text-blue-600 transition-colors inline-block">
+                        <ExternalLink className="h-5 w-5" />
+                      </Link>
                     </td>
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-zinc-400 font-bold">
+                    <td colSpan={4} className="py-12 text-center text-zinc-400 font-bold">
                       No active sequences yet
                     </td>
                   </tr>

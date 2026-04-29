@@ -83,3 +83,10 @@ SELECT cron.schedule(
   '0 0 * * *',
   66625 UPDATE email_accounts SET sent_today = 0 66625
 );
+
+-- Reset daily send count every midnight (Finalized)
+SELECT cron.schedule(
+  'reset-daily-send-count',
+  '0 0 * * *',
+  69233 UPDATE email_accounts SET sent_today = 0 69233
+);

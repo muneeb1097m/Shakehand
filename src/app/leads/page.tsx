@@ -1,135 +1,146 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { 
   Users, 
   Search, 
-  Download, 
-  Upload, 
-  Plus, 
-  MoreHorizontal,
-  Mail,
-  Phone,
-  Building2,
-  Tag
+  Filter, 
+  MoreHorizontal, 
+  Mail, 
+  Building2, 
+  ExternalLink,
+  Loader2,
+  Rocket
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const leads: any[] = [];
+import { createClient } from "@/utils/supabase/client";
 
 export default function LeadsPage() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [leads, setLeads] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "replied": return "bg-blue-500/10 text-blue-500 border-blue-500/20";
-      case "interested": return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
-      case "contacted": return "bg-zinc-500/10 text-zinc-500 border-zinc-500/20";
-      default: return "bg-zinc-500/10 text-zinc-500 border-zinc-500/20";
+  useEffect(() => {
+    async function fetchLeads() {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('campaign_contacts')
+        .select('*, contacts(*), campaigns(name)')
+        .order('added_at', { ascending: false });
+
+      if (data) setLeads(data);
+      setLoading(false);
     }
-  };
+    fetchLeads();
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen bg-zinc-50/50">
       <PageHeader
         title="Leads"
-        subtitle="Manage your prospective clients and their engagement history"
-        actions={
-          <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 transition-all font-semibold text-sm text-zinc-700 shadow-sm">
-              <Upload className="h-4 w-4 text-zinc-400" />
-              Import CSV
-            </button>
-            <button className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-blue-700 transition-all shadow-md shadow-blue-500/20">
-              <Plus className="h-4 w-4" />
-              Add Lead
-            </button>
-          </div>
-        }
+        subtitle="Manage leads enrolled in your campaigns"
       />
 
-      <div className="p-8 space-y-8">
+      <main className="p-8">
+        <div className="bg-white border border-zinc-200 rounded-[2.5rem] shadow-sm overflow-hidden">
+          {/* Table Controls */}
+          <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
+            <div className="flex items-center gap-4 flex-1 max-w-md">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search leads..." 
+                  className="w-full pl-11 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                />
+              </div>
+              <button className="flex items-center gap-2 px-4 py-2.5 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-600 hover:bg-zinc-50 transition-all">
+                <Filter className="h-4 w-4" />
+                Filter
+              </button>
+            </div>
+          </div>
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <input 
-            type="text" 
-            placeholder="Search leads by name, email, or company..."
-            className="w-full bg-card/50 border border-border rounded-xl pl-10 pr-4 py-2.5 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 bg-card/50 border border-border rounded-xl hover:bg-muted transition-all">
-          <Download className="h-5 w-5" />
-          Export
-        </button>
-      </div>
-
-      <div className="overflow-hidden rounded-3xl border border-border bg-card/50 backdrop-blur-sm">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="border-b border-border bg-muted/30">
-              <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Lead</th>
-              <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
-              <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Campaign</th>
-              <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Last Activity</th>
-              <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {leads.length > 0 ? leads.map((lead) => (
-              <tr key={lead.id} className="group hover:bg-muted/30 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-zinc-800 flex items-center justify-center font-bold text-primary">
-                      {lead.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-bold">{lead.name}</p>
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                        <Building2 className="h-3 w-3" />
-                        {lead.company}
+          {/* Leads Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b border-zinc-100">
+                  <th className="px-8 py-5">Lead Info</th>
+                  <th className="px-8 py-5">Campaign</th>
+                  <th className="px-8 py-5 text-center">Status</th>
+                  <th className="px-8 py-5 text-center">Enrolled At</th>
+                  <th className="px-8 py-5 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-50">
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="py-20 text-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
+                      <p className="text-zinc-400 font-bold mt-4">Loading leads...</p>
+                    </td>
+                  </tr>
+                ) : leads.length > 0 ? leads.map((lead) => (
+                  <tr key={lead.id} className="group hover:bg-zinc-50/50 transition-colors">
+                    <td className="px-8 py-5">
+                      <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-xl bg-zinc-100 flex items-center justify-center text-zinc-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                          <Users className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-zinc-900">{lead.contacts?.name}</p>
+                          <p className="text-xs text-zinc-400 font-medium">{lead.contacts?.email}</p>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={cn(
-                    "px-2.5 py-0.5 rounded-full text-xs font-semibold border uppercase tracking-widest",
-                    getStatusColor(lead.status)
-                  )}>
-                    {lead.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Tag className="h-4 w-4 text-muted-foreground" />
-                    {lead.campaign}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-sm text-muted-foreground">
-                  {lead.lastActivity}
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <button className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground">
-                    <MoreHorizontal className="h-5 w-5" />
-                  </button>
-                </td>
-              </tr>
-            )) : (
-              <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground font-bold">
-                  No leads yet
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex items-center gap-2">
+                        <Rocket className="h-3.5 w-3.5 text-zinc-300" />
+                        <span className="text-xs font-bold text-zinc-600">{lead.campaigns?.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex items-center justify-center">
+                        <span className={cn(
+                          "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest",
+                          lead.status === 'active' ? "bg-emerald-50 text-emerald-600" : 
+                          lead.status === 'unsubscribed' ? "bg-rose-50 text-rose-500" :
+                          "bg-zinc-100 text-zinc-400"
+                        )}>
+                          {lead.status}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5 text-center text-xs font-bold text-zinc-400">
+                      {new Date(lead.added_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <Link href={`/contacts/${lead.contact_id}`} className="p-2 text-zinc-300 hover:text-blue-600 transition-colors inline-block">
+                        <ExternalLink className="h-5 w-5" />
+                      </Link>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={5} className="py-20 text-center">
+                      <div className="flex flex-col items-center gap-4 opacity-30">
+                        <Users className="h-12 w-12" />
+                        <p className="text-zinc-500 font-bold max-w-xs">No leads yet. Launch a campaign to see leads appear here.</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
