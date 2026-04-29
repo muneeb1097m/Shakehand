@@ -59,3 +59,20 @@ USING (EXISTS (SELECT 1 FROM campaigns WHERE id = campaign_id AND user_id = auth
 
 -- Enable pg_cron extension (only needed once)
 CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+-- Add tracking_id to email_queue
+ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS tracking_id UUID DEFAULT gen_random_uuid();
+ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS opened_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS clicked_at TIMESTAMP WITH TIME ZONE;
+
+-- suppression_list already created in Day 1 migration, skip if exists
+CREATE TABLE IF NOT EXISTS suppression_list (
+  id         UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id    UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+  email      TEXT NOT NULL,
+  reason     TEXT DEFAULT 'unsubscribed',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+CREATE UNIQUE INDEX IF NOT EXISTS suppression_user_email_idx ON suppression_list (user_id, email);
+ALTER TABLE suppression_list ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage own suppression list." ON suppression_list FOR ALL USING (auth.uid() = user_id);

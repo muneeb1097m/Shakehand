@@ -139,6 +139,7 @@ export async function processEmailQueue(): Promise<{ sent: number; failed: numbe
         to: item.contacts.email,
         subject: item.subject,
         body: item.body,
+        trackingId: item.tracking_id,
       })
 
       await supabase
