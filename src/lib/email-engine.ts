@@ -1,32 +1,66 @@
 import nodemailer from 'nodemailer'
+import { randomBytes } from 'crypto'
 import { createClient } from '@/utils/supabase/server'
+import { decryptSecret } from './crypto'
+import { openPixelUrl, clickUrl, unsubscribeUrl } from './tracking'
 
 interface SendEmailParams {
   accountId: string
   to: string
   subject: string
   body: string
-  trackingId?: string
+  trackingId: string
+  trackOpens?: boolean
+  trackClicks?: boolean
+  inReplyTo?: string  // for follow-ups: ties the thread together
+  references?: string
 }
 
-function injectTracking(body: string, trackingId: string, baseUrl: string): string {
-  const pixel = `<img src="${baseUrl}/api/track/open?id=${trackingId}" width="1" height="1" style="display:none" />`
-  
-  // Wrap all links with click tracking
-  const trackedBody = body.replace(
-    /href="(https?:\/\/[^"]+)"/g,
-    (_, url) => `href="${baseUrl}/api/track/click?id=${trackingId}&url=${encodeURIComponent(url)}"`
-  )
-
-  const unsubscribeLink = `<p style="font-size:11px;color:#9ca3af;margin-top:32px;text-align:center;">
-    Don't want to receive these emails? 
-    <a href="${baseUrl}/api/unsubscribe?id=${trackingId}" style="color:#9ca3af;">Unsubscribe</a>
-  </p>`
-
-  return `${trackedBody}${unsubscribeLink}${pixel}`
+interface InjectionContext {
+  baseUrl: string
+  trackingId: string
+  trackOpens: boolean
+  trackClicks: boolean
+  senderAddress: string | null
 }
 
-export async function sendEmail({ accountId, to, subject, body, trackingId }: SendEmailParams) {
+function injectTracking(body: string, ctx: InjectionContext): string {
+  let out = body
+
+  if (ctx.trackClicks) {
+    out = out.replace(/href="(https?:\/\/[^"]+)"/g, (_, url) => {
+      // Don't rewrite our own unsubscribe link if a user already inlined one
+      if (url.includes('/api/unsubscribe')) return `href="${url}"`
+      return `href="${clickUrl(ctx.baseUrl, ctx.trackingId, url)}"`
+    })
+  }
+
+  const unsubLink = unsubscribeUrl(ctx.baseUrl, ctx.trackingId)
+  const addressLine = ctx.senderAddress
+    ? `<div style="font-size:11px;color:#9ca3af;margin-top:4px;">${escapeHtml(ctx.senderAddress)}</div>`
+    : ''
+
+  const footer = `
+    <div style="margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;">
+      <a href="${unsubLink}" style="font-size:11px;color:#9ca3af;text-decoration:underline;">Unsubscribe</a>
+      ${addressLine}
+    </div>`
+
+  const pixel = ctx.trackOpens
+    ? `<img src="${openPixelUrl(ctx.baseUrl, ctx.trackingId)}" width="1" height="1" style="display:none" alt="" />`
+    : ''
+
+  return `${out}${footer}${pixel}`
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
+}
+
+export async function sendEmail({
+  accountId, to, subject, body, trackingId,
+  trackOpens = false, trackClicks = false, inReplyTo, references,
+}: SendEmailParams) {
   const supabase = await createClient()
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
@@ -37,26 +71,48 @@ export async function sendEmail({ accountId, to, subject, body, trackingId }: Se
     .single()
 
   if (error || !account) throw new Error('Email account not found')
+  if (account.provider !== 'smtp') throw new Error('Unsupported provider')
 
-  const finalBody = trackingId ? injectTracking(body, trackingId, baseUrl) : body
+  const pass = decryptSecret(account.smtp_pass)
 
-  if (account.provider === 'smtp') {
-    const transporter = nodemailer.createTransport({
-      host: account.smtp_host,
-      port: account.smtp_port,
-      secure: account.smtp_port === 465,
-      auth: { user: account.smtp_user, pass: account.smtp_pass },
-    })
+  const finalBody = injectTracking(body, {
+    baseUrl,
+    trackingId,
+    trackOpens,
+    trackClicks,
+    senderAddress: account.sender_address || null,
+  })
 
-    const info = await transporter.sendMail({
-      from: `"${account.email}" <${account.smtp_user}>`,
-      to,
-      subject,
-      html: finalBody,
-    })
+  // Stable Message-ID we can match against IMAP later
+  const fromAddress = account.email
+  const domain = fromAddress.split('@')[1] || 'localhost'
+  const messageId = `<${trackingId}.${randomBytes(6).toString('hex')}@${domain}>`
 
-    return info
-  }
+  const transporter = nodemailer.createTransport({
+    host: account.smtp_host,
+    port: account.smtp_port,
+    secure: account.smtp_port === 465,
+    auth: { user: account.smtp_user, pass },
+  })
 
-  throw new Error('Unsupported provider')
+  const displayName = account.sender_name || account.email.split('@')[0]
+  const oneClickUrl = unsubscribeUrl(baseUrl, trackingId)
+
+  await transporter.sendMail({
+    from: { name: displayName, address: fromAddress },
+    to,
+    subject,
+    html: finalBody,
+    messageId,
+    inReplyTo,
+    references,
+    headers: {
+      // RFC 8058: one-click unsubscribe support, recognized by Gmail/Outlook
+      'List-Unsubscribe': `<${oneClickUrl}>, <mailto:unsubscribe+${trackingId}@${domain}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      'X-Entity-Ref-ID': trackingId,
+    },
+  })
+
+  return { messageId }
 }

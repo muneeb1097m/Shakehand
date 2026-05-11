@@ -11,10 +11,13 @@
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.0",
+    "@types/mailparser": "^3.4.5",
     "@types/nodemailer": "^8.0.0",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",
+    "imapflow": "^1.0.171",
     "lucide-react": "^0.577.0",
+    "mailparser": "^3.7.2",
     "next": "16.1.6",
     "nodemailer": "^8.0.5",
     "react": "19.2.3",
